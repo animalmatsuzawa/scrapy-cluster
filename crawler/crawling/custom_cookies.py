@@ -1,4 +1,4 @@
-from scrapy.contrib.downloadermiddleware.cookies import CookiesMiddleware
+from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
 
 
 class CustomCookiesMiddleware(CookiesMiddleware):

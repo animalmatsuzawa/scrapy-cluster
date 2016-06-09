@@ -15,7 +15,7 @@ class RedisThrottledQueue(object):
     time_append = ":throttle_time"  # appended to end to time key
 
     def __init__(self, redisConn, myQueue, throttleWindow, throttleLimit,
-                        moderate=False, windowName=None, modName=None):
+                        moderate=False, windowName=None, modName=None, throttle=False):
         '''
         For best performance, all instances of a throttled queue should have
             the same settings
@@ -43,6 +43,7 @@ class RedisThrottledQueue(object):
         else:
             self.window_key = windowName + self.window_append
 
+        self.throttle = throttle
         # moderation is useless when only grabbing 1 item in x secs
         if moderate and throttleLimit != 1:
             self.moderation = self.window / self.limit
@@ -164,6 +165,8 @@ class RedisThrottledQueue(object):
 
         @return: True if the queue was below the limit AND atomically updated
         '''
+        if not self.throttle:
+            return True
         with self.redis_conn.pipeline() as pipe:
             try:
                 pipe.watch(self.window_key)  # ---- LOCK

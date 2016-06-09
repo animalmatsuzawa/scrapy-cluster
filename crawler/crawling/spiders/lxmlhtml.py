@@ -20,7 +20,7 @@ class CustomParser(LxmlParserLinkExtractor):
         '''
         links = []
         # hacky way to get the underlying lxml parsed document
-        for el, attr, attr_val in self._iter_links(selector._root):
+        for el, attr, attr_val in self._iter_links(selector.root):
             # pseudo lxml.html.HtmlElement.make_links_absolute(base_url)
             try:
                 attr_val = urljoin(base_url, attr_val)

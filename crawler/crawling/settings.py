@@ -33,9 +33,10 @@ QUEUE_HITS = 10
 QUEUE_WINDOW = 60
 
 # we want the queue to produce a consistent pop flow
-QUEUE_MODERATED = True
+QUEUE_MODERATED = False
 
-# how long we want the duplicate timeout queues to stick around in seconds
+# how long we want the duplicate timeout queues to stick around in seconds(default 600)
+# -1 : not clear
 DUPEFILTER_TIMEOUT = 600
 
 # how often to refresh the ip address of the scheduler
@@ -106,7 +107,7 @@ STATS_TIMES = [
 
 # Scrapy Settings
 # ~~~~~~~~~~~~~~~
-DOWNLOADER_CLIENTCONTEXTFACTORY = 'crawling.contextfactory.MyClientContextFactory'
+#@@@@@ DOWNLOADER_CLIENTCONTEXTFACTORY = 'crawling.contextfactory.MyClientContextFactory'
 
 # Scrapy settings for distributed_crawling project
 #

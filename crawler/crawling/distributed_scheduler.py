@@ -16,6 +16,8 @@ import re
 from redis_dupefilter import RFPDupeFilter
 from kazoo.handlers.threading import KazooTimeoutError
 
+import sys,os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../../util')
 from scutils.zookeeper_watcher import ZookeeperWatcher
 from scutils.redis_queue import RedisPriorityQueue
 from scutils.redis_throttled_queue import RedisThrottledQueue
@@ -26,6 +28,7 @@ try:
 except ImportError:
     import pickle
 
+from scrapy.utils.reqser import request_to_dict, request_from_dict
 
 class DistributedScheduler(object):
     '''
@@ -61,7 +64,7 @@ class DistributedScheduler(object):
     my_assignment = None  # Zookeeper path to read actual yml config
 
     def __init__(self, server, persist, update_int, timeout, retries, logger,
-                 hits, window, mod, ip_refresh, add_type, add_ip, ip_regex):
+                 hits, window, mod, ip_refresh, add_type, add_ip, ip_regex, throt):
         '''
         Initialize the scheduler
         '''
@@ -72,6 +75,7 @@ class DistributedScheduler(object):
         self.hits = hits
         self.window = window
         self.moderated = mod
+        self.throttled = throt
         self.rfp_timeout = timeout
         self.ip_update_interval = ip_refresh
         self.add_type = add_type
@@ -221,7 +225,7 @@ class DistributedScheduler(object):
                 if the_domain not in self.domain_config:
                     self.queue_dict[key] = RedisThrottledQueue(self.redis_conn,
                     q, self.window, self.hits, self.moderated, throttle_key,
-                    throttle_key)
+                    throttle_key, self.throttled)
                 # use custom window and hits
                 else:
                     window = self.domain_config[the_domain]['window']
@@ -233,7 +237,7 @@ class DistributedScheduler(object):
 
                     self.queue_dict[key] = RedisThrottledQueue(self.redis_conn,
                     q, window, hits, self.moderated, throttle_key,
-                    throttle_key)
+                    throttle_key, self.throttled)
 
     def check_config(self):
         '''
@@ -298,6 +302,7 @@ class DistributedScheduler(object):
         add_ip = settings.get('SCHEDULER_IP_ENABLED', False)
         retries = settings.get('SCHEUDLER_ITEM_RETRIES', 3)
         ip_regex = settings.get('IP_ADDR_REGEX', '.*')
+        throt = settings.get('QUEUE_THROTTLED', False)
 
         my_level = settings.get('SC_LOG_LEVEL', 'INFO')
         my_name = settings.get('SC_LOGGER_NAME', 'sc-logger')
@@ -318,7 +323,7 @@ class DistributedScheduler(object):
                                          backups=my_backups)
 
         return cls(server, persist, up_int, timeout, retries, logger, hits,
-                   window, mod, ip_refresh, add_type, add_ip, ip_regex)
+                   window, mod, ip_refresh, add_type, add_ip, ip_regex, throt)
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -330,7 +335,8 @@ class DistributedScheduler(object):
         self.spider.set_redis(self.redis_conn)
         self.spider.setup_stats()
         self.create_queues()
-        self.setup_zookeeper()
+        if not settings.get('KAFKA_REMOVE', False) :
+            self.setup_zookeeper()
         self.dupefilter = RFPDupeFilter(self.redis_conn,
                                         self.spider.name + ':dupefilter',
                                         self.rfp_timeout)
@@ -418,6 +424,7 @@ class DistributedScheduler(object):
              #  callback/errback are assumed to be a bound instance of the spider
             'callback': None if request.callback is None else request.callback.func_name,
             'errback': None if request.errback is None else request.errback.func_name,
+            'request': pickle.dumps(request_to_dict(request, self.spider), protocol=-1),
         }
         return req_dict
 
@@ -464,7 +471,10 @@ class DistributedScheduler(object):
             self.logger.debug("Found url to crawl {url}" \
                     .format(url=item['url']))
             try:
-                req = Request(item['url'])
+                if 'request' in item:
+                    req = request_from_dict(pickle.loads(item['request']), self.spider)
+                else:
+                    req = Request(item['url'])
             except ValueError:
                 # need absolute url
                 # need better url validation here

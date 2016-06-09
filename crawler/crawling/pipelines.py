@@ -12,6 +12,9 @@ from kafka import KafkaClient, SimpleProducer
 from kafka.common import KafkaUnavailableError
 
 from crawling.items import RawResponseItem
+
+import sys,os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../../utils')
 from scutils.log_factory import LogFactory
 
 
@@ -107,15 +110,19 @@ class KafkaPipeline(object):
                                          file=my_file,
                                          bytes=my_bytes,
                                          backups=my_backups)
-
-        try:
-            kafka = KafkaClient(settings['KAFKA_HOSTS'])
-            producer = SimpleProducer(kafka)
-        except KafkaUnavailableError:
-                logger.error("Unable to connect to Kafka in Pipeline"\
-                    ", raising exit flag.")
-                # this is critical so we choose to exit
-                sys.exit(1)
+        
+        if settings.get('KAFKA_REMOVE', False):
+            kafka = None
+            producer = None
+        else:
+            try:
+                kafka = KafkaClient(settings['KAFKA_HOSTS'])
+                producer = SimpleProducer(kafka)
+            except KafkaUnavailableError:
+                    logger.error("Unable to connect to Kafka in Pipeline"\
+                        ", raising exit flag.")
+                    # this is critical so we choose to exit
+                    sys.exit(1)
         topic_prefix = settings['KAFKA_TOPIC_PREFIX']
         use_base64 = settings['KAFKA_BASE_64_ENCODE']
 
@@ -127,6 +134,8 @@ class KafkaPipeline(object):
         return cls.from_settings(crawler.settings)
 
     def process_item(self, item, spider):
+        if self.kafka is None:
+            return
         try:
             self.logger.debug("Processing item in KafkaPipeline")
             datum = dict(item)

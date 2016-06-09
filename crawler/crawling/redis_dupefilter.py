@@ -24,7 +24,8 @@ class RFPDupeFilter(BaseDupeFilter):
         c_id = request.meta['crawlid']
 
         added = self.server.sadd(self.key + ":" + c_id, fp)
-        self.server.expire(self.key + ":" + c_id, self.timeout)
+        if self.timeout != -1:
+            self.server.expire(self.key + ":" + c_id, self.timeout)
 
         return not added
 
@@ -38,4 +39,8 @@ class RFPDupeFilter(BaseDupeFilter):
         '''
         Clears fingerprints data
         '''
-        self.server.delete(self.key)
+        #self.server.delete(self.key)
+        del_key=self.key+":*"
+        for key in self.server.keys(del_key):
+          self.server.delete(key)
+

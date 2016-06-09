@@ -2,6 +2,8 @@ from scrapy import signals
 from scrapy.exceptions import DontCloseSpider
 from scrapy.spiders import Spider
 
+import sys,os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../../../utils')
 from scutils.stats_collector import StatsCollector
 import socket
 import time

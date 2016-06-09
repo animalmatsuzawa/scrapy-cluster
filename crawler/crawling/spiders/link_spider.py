@@ -1,12 +1,13 @@
 import scrapy
 
-from scrapy.http import Request
+from scrapy.http import Request, FormRequest
 from lxmlhtml import CustomLxmlLinkExtractor as LinkExtractor
 from scrapy.conf import settings
 
 from crawling.items import RawResponseItem
 from redis_spider import RedisSpider
 
+from loginform import fill_login_form
 
 class LinkSpider(RedisSpider):
     '''
@@ -21,6 +22,17 @@ class LinkSpider(RedisSpider):
     def parse(self, response):
         self._logger.debug("crawled url {}".format(response.request.url))
         self._increment_status_code_stat(response)
+
+        #login
+        #if response.url == 'http://fyqe73pativ7vdif.onion/login/':
+        #    data, url, method = fill_login_form(response.url, response.body, 'w-_-w', '1234567890')
+        #    print url 
+        #    print data 
+        #    print method 
+        #    yield FormRequest(url, formdata=dict(data), 
+        #        method=method, callback=self.parse, meta=response.meta)
+        #    return
+
         cur_depth = 0
         if 'curdepth' in response.meta:
             cur_depth = response.meta['curdepth']
@@ -43,7 +55,7 @@ class LinkSpider(RedisSpider):
         item["links"] = []
 
         # determine whether to continue spidering
-        if cur_depth >= response.meta['maxdepth']:
+        if response.meta['maxdepth'] != -1 and cur_depth >= response.meta['maxdepth']:
             self._logger.debug("Not spidering links in '{}' because" \
                 " cur_depth={} >= maxdepth={}".format(
                                                       response.url,
@@ -52,6 +64,7 @@ class LinkSpider(RedisSpider):
         else:
             # we are spidering -- yield Request for each discovered link
             link_extractor = LinkExtractor(
+                            deny_domains=response.meta['denied_domains'],
                             allow_domains=response.meta['allowed_domains'],
                             allow=response.meta['allow_regex'],
                             deny=response.meta['deny_regex'],

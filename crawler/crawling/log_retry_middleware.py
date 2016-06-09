@@ -9,7 +9,8 @@ from twisted.internet import defer
 from twisted.internet.error import TimeoutError, DNSLookupError, \
         ConnectionRefusedError, ConnectionDone, ConnectError, \
         ConnectionLost, TCPTimedOutError
-
+import sys,os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../../utils')
 from scutils.stats_collector import StatsCollector
 from scutils.log_factory import LogFactory
 

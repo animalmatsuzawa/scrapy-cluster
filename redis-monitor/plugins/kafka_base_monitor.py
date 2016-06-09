@@ -18,6 +18,9 @@ class KafkaBaseMonitor(BaseMonitor):
 
         @param settings: The loaded settings file
         '''
+        if settings['KAFKA_REMOVE']:
+            return
+
         @MethodTimer.timeout(settings['KAFKA_CONN_TIMEOUT'], False)
         def _hidden_setup():
             try:
@@ -49,6 +52,8 @@ class KafkaBaseMonitor(BaseMonitor):
         @param master: the final dict to send
         @returns: True if successfully sent to kafka
         '''
+        if settings['KAFKA_REMOVE']:
+            return
         appid_topic = "{prefix}.outbound_{appid}".format(
                                                     prefix=self.topic_prefix,
                                                     appid=master['appid'])
