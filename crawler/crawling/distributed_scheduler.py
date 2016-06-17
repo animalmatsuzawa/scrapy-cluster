@@ -13,6 +13,7 @@ import uuid
 import socket
 import re
 
+from scrapy.utils.misc import load_object
 from redis_dupefilter import RFPDupeFilter
 from kazoo.handlers.threading import KazooTimeoutError
 
@@ -22,6 +23,8 @@ from scutils.zookeeper_watcher import ZookeeperWatcher
 from scutils.redis_queue import RedisPriorityQueue
 from scutils.redis_throttled_queue import RedisThrottledQueue
 from scutils.log_factory import LogFactory
+
+from crawling.splash_util import make_splash_meta
 
 try:
     import cPickle as pickle
@@ -41,7 +44,7 @@ class DistributedScheduler(object):
     spider = None # the spider using this scheduler
     queue_keys = None # the list of current queues
     queue_class = None # the class to use for the queue
-    dupefilter = None # the redis dupefilter
+    df = None # the redis dupefilter
     update_time = 0 # the last time the queues were updated
     update_ip_time = 0 # the last time the ip was updated
     update_interval = 0 # how often to update the queues
@@ -63,11 +66,12 @@ class DistributedScheduler(object):
     zoo_client = None  # The KazooClient to manage the config
     my_assignment = None  # Zookeeper path to read actual yml config
 
-    def __init__(self, server, persist, update_int, timeout, retries, logger,
+    def __init__(self, dupefilter, server, persist, update_int, timeout, retries, logger,
                  hits, window, mod, ip_refresh, add_type, add_ip, ip_regex, throt):
         '''
         Initialize the scheduler
         '''
+        self.df = dupefilter
         self.redis_conn = server
         self.persist = persist
         self.queue_dict = {}
@@ -304,6 +308,9 @@ class DistributedScheduler(object):
         ip_regex = settings.get('IP_ADDR_REGEX', '.*')
         throt = settings.get('QUEUE_THROTTLED', False)
 
+        dupefilter_cls = load_object(settings['DUPEFILTER_CLASS'])
+        dupefilter = dupefilter_cls.from_settings(settings)
+
         my_level = settings.get('SC_LOG_LEVEL', 'INFO')
         my_name = settings.get('SC_LOGGER_NAME', 'sc-logger')
         my_output = settings.get('SC_LOG_STDOUT', True)
@@ -322,7 +329,7 @@ class DistributedScheduler(object):
                                          bytes=my_bytes,
                                          backups=my_backups)
 
-        return cls(server, persist, up_int, timeout, retries, logger, hits,
+        return cls(dupefilter, server, persist, up_int, timeout, retries, logger, hits,
                    window, mod, ip_refresh, add_type, add_ip, ip_regex, throt)
 
     @classmethod
@@ -337,15 +344,18 @@ class DistributedScheduler(object):
         self.create_queues()
         if not settings.get('KAFKA_REMOVE', False) :
             self.setup_zookeeper()
-        self.dupefilter = RFPDupeFilter(self.redis_conn,
-                                        self.spider.name + ':dupefilter',
-                                        self.rfp_timeout)
+#        self.dupefilter = RFPDupeFilter(self.redis_conn,
+#                                        self.spider.name + ':dupefilter',
+#                                        self.rfp_timeout)
+        if isinstance(self.df, RFPDupeFilter):
+            self.df.set_key( self.spider.name +':dupefilter' )
+#            pass
 
     def close(self, reason):
         self.logger.info("Closing Spider", {'spiderid':self.spider.name})
         if not self.persist:
             self.logger.warning("Clearing crawl queues")
-            self.dupefilter.clear()
+            self.df.clear()
             for key in self.queue_keys:
                 self.queue_dict[key].clear()
 
@@ -364,7 +374,7 @@ class DistributedScheduler(object):
         '''
         Pushes a request from the spider into the proper throttled queue
         '''
-        if not request.dont_filter and self.dupefilter.request_seen(request):
+        if not request.dont_filter and self.df.request_seen(request):
             self.logger.debug("Request not added back to redis")
             return
         req_dict = self.request_to_dict(request)
@@ -474,11 +484,11 @@ class DistributedScheduler(object):
                 if 'request' in item:
                     req = request_from_dict(pickle.loads(item['request']), self.spider)
                 else:
-                    req = Request(item['url'])
+                    req = Request(item['url'], meta=make_splash_meta({}))
             except ValueError:
                 # need absolute url
                 # need better url validation here
-                req = Request('http://' + item['url'])
+                req = Request('http://' + item['url'], meta=make_splash_meta({}))
 
             if 'meta' in item:
                 item = item['meta']
@@ -490,7 +500,8 @@ class DistributedScheduler(object):
                 item['retry_times'] = 0
 
             for key in item.keys():
-                req.meta[key] = item[key]
+                if key != 'request' :
+                    req.meta[key] = item[key]
 
             # extra check to add items to request
             if 'useragent' in item and item['useragent'] is not None:

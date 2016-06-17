@@ -119,7 +119,7 @@ NEWSPIDER_MODULE = 'crawling.spiders'
 # Enables scheduling storing requests queue in redis.
 SCHEDULER = "crawling.distributed_scheduler.DistributedScheduler"
 
-
+DUPEFILTER_CLASS = "crawling.redis_dupefilter.RFPDupeFilter"
 
 # Store scraped item in redis for post-processing.
 ITEM_PIPELINES = {
@@ -140,6 +140,7 @@ DOWNLOADER_MIDDLEWARES = {
     'crawling.redis_retry_middleware.RedisRetryMiddleware': 510,
     # exceptions processed in reverse order
     'crawling.log_retry_middleware.LogRetryMiddleware': 520,
+
     # custom cookies to not persist across crawl requests
     'scrapy.contrib.downloadermiddleware.cookies.CookiesMiddleware': None,
     'crawling.custom_cookies.CustomCookiesMiddleware': 700,

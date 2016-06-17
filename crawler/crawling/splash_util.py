@@ -3,6 +3,9 @@
 from scrapy.conf import settings
 
 def make_splash_meta( _meta ):
+    if settings.get('SPLASH_ENABLED') == False:
+        return _meta
+
     script = """
     function main(splash)
       splash:init_cookies(splash.args.cookies)

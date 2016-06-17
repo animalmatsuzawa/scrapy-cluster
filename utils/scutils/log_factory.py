@@ -229,7 +229,8 @@ class LogObject(object):
         '''
         Adds the log level to the dict object
         '''
-        my_copy = copy.deepcopy(dict)
+#        my_copy = copy.deepcopy(dict)
+        my_copy = copy.copy(dict)
         if 'level' not in my_copy:
             my_copy['level'] = level
         if 'timestamp' not in my_copy:

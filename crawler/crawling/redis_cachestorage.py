@@ -14,6 +14,8 @@ from scrapy.utils.project import data_path
 from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.python import to_bytes, to_unicode
 
+from scrapy_splash.dupefilter import splash_request_fingerprint
+
 logger = logging.getLogger(__name__)
 
 class RedisCacheStorage(object):
@@ -77,5 +79,12 @@ class RedisCacheStorage(object):
             return pickle.loads(data)
 
     def _request_key(self, request):
-        return to_bytes(request_fingerprint(request))
+        return to_bytes(self.request_fingerprint(request))
+
+    def request_fingerprint(self, request):
+        return request_fingerprint(request)
+
+class SplashRedisCacheStorage(RedisCacheStorage):
+    def request_fingerprint(self, request):
+        return splash_request_fingerprint(request)
 

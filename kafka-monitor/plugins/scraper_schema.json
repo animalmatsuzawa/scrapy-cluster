@@ -89,6 +89,22 @@
         "attrs": {
             "type": "object",
             "default": null
+        },
+        "login" : {
+            "type": "object",
+            "patternProperties": {
+                "^https?(://[-_.!~*'()a-zA-Z0-9;/?:@&=+$,%#]+)$":{
+                    "properties": {
+                        "loginid": {
+                            "type": "string"
+                        },
+                        "password": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "default": null
         }
     },
     "required": [
